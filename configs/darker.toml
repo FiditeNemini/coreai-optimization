@@ -1,0 +1,9 @@
+[tool.darker]
+formatter = "ruff"
+# PEP 8 recommends 79 characters
+# Black and Ruff default to 88 characters
+# We concluded that 88 is too restrictive for some use cases, so we use 100
+# Darker should override tool.ruff, but does not
+line-length = 100
+revision = "main"
+target-version = "py311"

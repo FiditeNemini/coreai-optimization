@@ -1,0 +1,300 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=42", "wheel" ]
+
+[project]
+name = "coreai-opt"
+description = "A library for PyTorch model compression and optimizations for deployment via Core AI on Apple silicon."
+readme = { file = "README.pypi.md", content-type = "text/markdown" }
+keywords = [
+    "apple",
+    "compression",
+    "core ai",
+    "machine learning",
+    "model optimization",
+    "palettization",
+    "pytorch",
+    "quantization",
+]
+license = "BSD-3-Clause"
+requires-python = ">=3.11,<3.14"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dynamic = [ "version" ]
+dependencies = [
+    "coremltools>=8.3",
+    "numpy>=2,<2.4",              # TODO: Remove once coremltools has released a version > 9.0
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",
+    "safetensors>=0.5.3,<=0.7.0",
+    # PyTorch >= 2.9.0 requires torchao >= 0.15.0
+    # Python's standard dependency specification (PEP 508) doesn't support conditional dependencies
+    # based on other package versions. We can either 1) add a stricter check to require the newer torchao
+    # version for everyone, or 2) add a runtime check in src/coreai_opt/init.py to ensure torchao
+    # version >= 0.15.0 for torch version >= 2.9.0. Opting option 1.
+    # These torch versions must be in bounds of lowest_tested_torch and highest_tested_torch
+    "torch>=2.8.0,<=2.11.0",
+    "torchao>=0.15.0,<=0.17.0",
+    "tqdm>=4.65",
+]
+[[project.authors]]
+name = "Apple Core AI Optimization Team"
+[project.optional-dependencies]
+coreai = [
+    "coreai-core==1.0.0b1",
+    "coreai-torch==0.4.0",
+    "scikit-learn>=1.7.2",
+]
+[project.urls]
+Changelog = "https://github.com/apple/coreai-optimization/blob/main/CHANGELOG.md"
+Repository = "https://github.com/apple/coreai-optimization"
+
+[dependency-groups]
+dev = [
+    "build>=1.0.0",
+    "mypy>=1.0.0",
+    "nox>=2025.11.12",
+    "nox-uv>=0.7.0",
+    "packaging",
+    "py-repo-root>=2.0.1",
+    "setuptools",
+    "towncrier",
+    "types-setuptools",
+    { include-group = "pre-commit" },
+    { include-group = "test" },
+    { include-group = "torchvision" },
+]
+test = [
+    "junitparser>=4.0.2",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+]
+docs = [
+    "autodoc-pydantic==2.2.0",
+    "ipython",
+    "myst-parser==4.0.0",
+    "nbsphinx>=0.9.0",
+    "shibuya==2026.5.19",
+    "sphinx==8.0.2",
+    "sphinx-copybutton==0.5.2",
+    "sphinx-llm==0.3.0",
+    "sphinxcontrib-mermaid==1.0.0",
+    { include-group = "stable-coreai" },
+]
+# Used in CI to force latest mimimum supported torch version
+# These torch versions must be in bounds of torch versions listed in project dependencies
+highest_tested_torch = [
+    "torch==2.11.0",
+    "torchao==0.17.0",
+    "torchvision==0.26.0",
+]
+# Latest CoreAI nightly
+latest-coreai = [
+    "coreai-core",
+    "coreai-torch",
+    "scikit-learn>=1.7.2",
+]
+# Used in CI to force lowest mimimum supported torch version
+# These torch versions must be in bounds of torch versions listed in project dependencies
+lowest_tested_torch = [
+    "torch==2.8.0",
+    "torchao==0.15.0",
+    "torchvision==0.23.0",
+]
+pre-commit = [
+    "bashate>=2.1.1",
+    "darker>=3.0.0",
+    "jinja2>=3.0",
+    "mbake",
+    "mdformat>=0.7.22",
+    "mdformat-black",
+    "mdformat-frontmatter",
+    "mdformat-gfm",
+    "pre-commit>=3.0.0",
+    "pre-commit-hooks>=5.0.0",
+    "pymarkdownlnt>=0.9.33",
+    "pyproject-fmt",
+    "python-kacl",
+    "ruff>=0.14.8",
+    "taplo>=0.9.3",
+    # pyproject-fmt 2.21.2 imports the private `_build_cli` from toml-fmt-common,
+    # which was renamed to `build_cli` in 1.3.3. Pin until pyproject-fmt updates.
+    "toml-fmt-common==1.3.2",
+    "toml-sort>=0.24.3",
+    "tomli-w>=1.0.0",
+]
+# TODO: deduplicate coreai dependencies across groups
+stable-coreai = [
+    "coreai-core==1.0.0b1",
+    "coreai-torch==0.4.0",
+    "scikit-learn>=1.7.2",
+]
+tamm-export = []
+# Since torch and torchao are project dependencies, we need to include torchvision in dev
+# This allows standard `make test` to find torchvision
+torchvision = [
+    "torchvision>=0.23.0,<=0.26.0",
+]
+tutorial = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+    "nbconvert>=7.17.1",
+    "papermill>=2.7.0",
+    "torchinfo>=1.8.0",
+    { include-group = "stable-coreai" },
+    { include-group = "torchvision" },
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+[tool.setuptools.dynamic]
+version = { attr = "coreai_opt._about.__version__" }
+[tool.setuptools.package-data]
+coreai_opt = [ "py.typed" ]
+[tool.setuptools.packages]
+find.exclude = [ "coreai_opt_benchmarking*", "tests*" ]
+find.where = [ "src" ]
+
+# make env group installed by default with uv sync
+[tool.uv]
+default-groups = [ "dev", "stable-coreai" ]
+index = [
+    { explicit = true, name = "pytorch-cpu", url = "https://download.pytorch.org/whl/cpu" },
+    { explicit = true, name = "pytorch-cu128", url = "https://download.pytorch.org/whl/cu128" },
+]
+# Only resolve for platforms where all dependencies (including coreai) exist
+environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+# Declare conflicting groups so uv does not error
+conflicts = [
+    [
+        { group = "highest_tested_torch" },
+        { group = "lowest_tested_torch" },
+    ],
+    [
+        { group = "stable-coreai" },
+        { group = "latest-coreai" },
+    ],
+    [
+        { extra = "coreai" },
+        { group = "latest-coreai" },
+    ],
+]
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [ ".oss-export" ]
+[tool.ruff.lint]
+select = [
+    "B",      # enable flake8-bugbear checks
+    "E",      # enable pycodestyle error checks
+    "E4",     # pycodestyle E4xx (import style)
+    "E5",     # pycodestyle E5xx (line length/backslash)
+    "E7",     # pycodestyle E7xx (multiple statements)
+    "E9",     # pycodestyle E9xx (runtime errors)
+    "F",      # enable Pyflakes error checks
+    "I",      # sort imports
+    "PLC",    # Add Python Library Checker convention rules
+    "PLE",    # Add Python Library Checker error rules
+    "RUF022", # sort __all__ lists
+    "RUF100", # remove unused noqa pragmas
+    "TC004",  # catch runtime imports in TYPE_CHECKING blocks
+    "UP",     # apply pyupgrade modernization rules
+]
+ignore = [
+    "ANN401", # allow type `Any`.
+    "RUF100", # disable the "unused-noqa" rule
+]
+per-file-ignores."__init__.py" = [ "F401" ]  # Ignore unused imports in __init__.py files
+per-file-ignores."scripts/release/*.py" = [ "S603", "T201" ]
+per-file-ignores."tests/**/*.py" = [ "ANN001", "ANN201", "D103", "PLR2004", "S101" ]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+flake8-annotations.allow-star-arg-any = true
+isort.combine-as-imports = true
+isort.force-single-line = false
+isort.known-first-party = [ "coreai_opt" ]
+pylint.max-args = 8
+
+# A sorting utility for toml files. The `toml-sort-fix` pre-commit hook
+# excludes pyproject-shaped files (which are owned by pyproject-fmt), so this
+# config only governs other TOML files in the repo (lychee, bake, etc.).
+[tool.tomlsort]
+in_place = true  # overwrite the original input file with changes
+sort_table_keys = true  # sort keys within tables
+spaces_indent_inline_array = 4  # 4 spaces to indent a multiline inline array
+trailing_comma_inline_array = true  # add trailing comma to the last item in a multiline inline array
+
+[tool.mypy]
+exclude = [ "\\.oss-export/" ]
+python_version = "3.11"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+strict_optional = true
+warn_return_any = true
+plugins = [ "pydantic.mypy" ]
+warn_unused_configs = true
+overrides = [
+    { follow_imports = "skip", module = "numpy.*" },
+    { follow_imports = "skip", module = "torch.*" },
+    { follow_imports = "skip", module = "torchvision.*" },
+    { module = "torchao.*", ignore_missing_imports = true, follow_imports = "skip" },
+    { module = "tests.*", ignore_errors = true },
+]
+no_implicit_optional = true
+
+[tool.pytest]
+[tool.pytest.ini_options]
+log_date_format = "%Y-%m-%d %H:%M:%S.%f%z"
+log_format = "%(asctime)s %(levelname)s %(name)s:%(lineno)d: %(message)s"
+log_level = "NOTSET"
+markers = [
+    "seed(value): enable deterministic seeding; no value uses default seed (42), value=None means nondeterministic seeding",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+norecursedirs = [ ".oss-export" ]
+testpaths = [ "tests" ]
+
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## [{version}] - {project_date}"
+issue_format = ""  # Don't include issue names in the changelog
+underlines = [ "", "", "" ]
+create_add_extension = false
+type = [
+    { name = "Added" },
+    { name = "Changed" },
+    { name = "Deprecated" },
+    { name = "Removed" },
+    { name = "Fixed" },
+    { name = "Security" },
+]
+
+[tool.pymarkdown]
+[tool.pymarkdown.plugins]
+md010.code_blocks = false

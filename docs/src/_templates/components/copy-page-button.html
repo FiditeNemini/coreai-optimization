@@ -1,0 +1,80 @@
+{#-
+  Copyright 2026 Apple Inc.
+
+  Use of this source code is governed by a BSD-3-Clause license that can
+  be found in the LICENSE file or at https://opensource.org/licenses/BSD-3-Clause
+-#}
+
+
+{#-
+  Override of shibuya/components/copy-page-button.html. The stock template
+  requires html_baseurl + html_copy_source or source_type/_user/_repo to be
+  set; we route at the sphinx-llm <basename>.html.md output instead.
+
+  Basename only (last segment of pagename): nested pages like
+  quantization/api.html resolve api.html.md -> quantization/api.html.md.
+
+  The Markdown icon is loaded from _static/icons/ instead of <iconify-icon>
+  so it renders without a network fetch to api.iconify.design (which is
+  blocked on some deployments). Copy feedback and the file:// guard live in
+  _static/copy-page-button.js.
+-#}
+
+{%- set _show_ai_links = theme_show_ai_links and not (meta and meta.hide_ai_links) -%}
+{%- set _md_url = pagename.rsplit('/', 1)[-1] ~ '.html.md' -%}
+
+{%- if _show_ai_links -%}
+<div class="copy-page-wrapper relative pb-4 lg:absolute lg:top-8 lg:right-6 xl:right-12">
+  <div id="copy-page-trigger">
+    {#- On notebook (nbsphinx) pages, prepend a "Download notebook" segment that
+        links to the .ipynb copied next to the rendered page. The inline SVG uses
+        currentColor so it adapts to light/dark like the adjacent copy icon. -#}
+    {%- if page_source_suffix == '.ipynb' -%}
+    <a
+      class="js-download px-3 py-1 inline-flex items-center gap-1"
+      href="{{ pagename.rsplit('/', 1)[-1] ~ page_source_suffix }}"
+      download
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span>{{ _('Download notebook') }}</span>
+    </a>
+    {%- endif -%}
+    <button
+      type="button"
+      class="js-copy px-3 py-1 inline-flex items-center gap-1"
+      data-url="{{ _md_url }}"
+    >
+      <i class="i-lucide" data-icon="copy"></i>
+      <span>{{ _('Copy page') }}</span>
+    </button>
+    <button class="js-menu px-2 py-1" type="button" aria-label="{{ _('More actions') }}"
+      aria-haspopup="menu" aria-expanded="false" aria-controls="copy-page-content">
+      <i class="i-lucide chevron-down"></i>
+    </button>
+  </div>
+  <div id="copy-page-content" role="menu" aria-orientation="vertical" aria-hidden="true">
+    <div role="presentation">
+      <div class="flex flex-col" role="group">
+        <button class="js-copy" type="button" role="menuitem" data-url="{{ _md_url }}">
+          <span class="iconify-icon">
+            <i class="i-lucide" data-icon="copy"></i>
+          </span>
+          <span>{{ _('Copy page') }}</span>
+        </button>
+        <a role="menuitem" href="{{ _md_url }}" target="_blank" rel="nofollow">
+          <span class="iconify-icon">
+            <img src="{{ pathto('_static/icons/markdown.svg', 1) }}" alt="" width="14" height="14">
+          </span>
+          <span>{{ _('View as Markdown') }}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{%- endif -%}

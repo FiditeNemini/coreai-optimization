@@ -1,0 +1,353 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  # =============================================================================
+  # 0. File Generation
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-generation
+        name: '━━━━━━━━━━━━ 0. File Generation ━━━━━━━━━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  # ----------------------------------------------------------------------------
+  # 0.1 Insert/refresh BSD-3-Clause license header
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: add-license-header
+        name: 'Add BSD-3 license header'
+        language: system
+        entry: scripts/pre_commit/add_license_header.py --license-file configs/BSD-3-LICENSE-HEADER-TEMPLATE --start-year 2026
+        files: '\.(py|sh|js|css|html)$|(^|/)(GNUmakefile|[Mm]akefile)$'
+
+  # ----------------------------------------------------------------------------
+  # 0.2 Update LICENSE year
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: update-license-year
+        name: 'Update LICENSE year'
+        description: Render LICENSE from configs/BSD-3-LICENSE-TEMPLATE, replacing {year} with `<start>-<current>` (or just `<current>` if equal). Always runs so the year auto-bumps on the first commit of each calendar year.
+        language: system
+        entry: scripts/pre_commit/update_license_year.py --template configs/BSD-3-LICENSE-TEMPLATE --license-file LICENSE
+        pass_filenames: false
+        always_run: true
+
+  # =============================================================================
+  # 1. Sanity / Text Hygiene
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-sanity
+        name: '━━━━━━━━━━━━ 1. Sanity / Text Hygiene ━━━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  - repo: local
+    hooks:
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        language: system
+        entry: trailing-whitespace-fixer
+        types: [text]
+
+      - id: end-of-file-fixer
+        name: fix end of files
+        language: system
+        entry: end-of-file-fixer
+        types: [text]
+        exclude: ^\.codegenius/learnings\.md$
+
+      - id: check-yaml
+        name: check yaml
+        language: system
+        entry: check-yaml
+        types: [yaml]
+
+      - id: check-added-large-files
+        name: check for added large files
+        language: system
+        entry: check-added-large-files
+        exclude: ^tests/_test_artifacts/
+
+  # =============================================================================
+  # 2. Formatting / Auto-fixes
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-formatting
+        name: '━━━━━━━━━━━━ 2. Formatting / Auto-fixes ━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  # ----------------------------------------------------------------------------
+  # 2.1 Format Python Import Sorting (ruff)
+  # ----------------------------------------------------------------------------
+
+  - repo: local
+    hooks:
+      - id: ruff-isort
+        name: 'Format Python Import Sorting (ruff)'
+        language: system
+        entry: ruff check --select=I --fix
+        types_or: [python, pyi]
+
+      # ----------------------------------------------------------------------------
+      # 2.2 Format Python `__all__` Sorting (ruff)
+      # ----------------------------------------------------------------------------
+
+      - id: ruff-all-sort
+        name: 'Format Python `__all__` Sorting (ruff)'
+        language: system
+        entry: ruff check --select=RUF022 --fix
+        types: [python]
+
+  # ----------------------------------------------------------------------------
+  # 2.3 Format Python Code (darker)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: darker
+        name: 'Format Python Code Line Length (darker)'
+        language: system
+        entry: darker
+        types: [python]
+        args: [--config, configs/darker.toml]
+
+  # ----------------------------------------------------------------------------
+  # 2.4 Format TOML Sorting (toml-sort)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: toml-sort-fix
+        name: 'Format TOML Sorting (toml-sort)'
+        language: system
+        entry: toml-sort --in-place
+        types: [toml]
+        # pyproject-shaped files are owned by pyproject-fmt; toml-sort's
+        # whitespace conventions (blank line after header comments, no spaces
+        # inside inline tables) conflict with pyproject-fmt's, and neither
+        # tool exposes a knob to align them.
+        exclude: (^|/)pyproject[^/]*\.toml$
+
+  # ----------------------------------------------------------------------------
+  # 2.5 Format pyproject.toml (pyproject-fmt)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pyproject-fmt
+        name: 'Format pyproject.toml (pyproject-fmt)'
+        language: system
+        entry: pyproject-fmt --config configs/pyproject-fmt.toml
+        files: (^|/)(pyproject\.toml|pyproject_[^/]+\.toml)$
+        # `src/coreai_opt_benchmarking/` is internal-only (stripped from the
+        # OSS export); its sub-pyproject has its own convention and shouldn't
+        # be reformatted by the main project's pyproject-fmt config.
+        exclude: ^src/coreai_opt_benchmarking/pyproject\.toml$
+
+  # ----------------------------------------------------------------------------
+  # 2.6 Format Makefile (mbake)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: mbake-format
+        name: Format Makefile (mbake)
+        entry: mbake format --config configs/.bake.toml
+        language: system
+        files: '(^|/)(GNUmakefile|[Mm]akefile|.*\.mk)$'
+
+  # ----------------------------------------------------------------------------
+  # 2.7 Format Markdown (mdformat)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: mdformat
+        name: 'Format Markdown (mdformat)'
+        language: system
+        entry: mdformat --number
+        files: \.(md)$
+        exclude: ^(CHANGELOG\.md|\.codegenius/learnings\.md)$
+        args: [
+            --number, # Force 1., 2., 3. instead of all 1.
+            --wrap=keep, # Preserve existing line breaks
+          ]
+
+  # ----------------------------------------------------------------------------
+  # 2.8 Format Shell Scripts (shfmt)
+  # ----------------------------------------------------------------------------
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.12.0-2
+    hooks:
+      - id: shfmt
+        name: 'Format Shell Script (shfmt)'
+
+  # =============================================================================
+  # 3. Lint / Static Analysis
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-lint
+        name: '━━━━━━━━━━━━ 3. Lint / Static Analysis ━━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  # ----------------------------------------------------------------------------
+  # 3.1 Linter: Ruff
+  # ----------------------------------------------------------------------------
+
+  - repo: local
+    hooks:
+      - id: ruff-lint
+        name: 'Ruff Comprehensive Lint Fix'
+        language: system
+        entry: ruff check --fix
+        types_or: [python, pyi]
+
+  # ----------------------------------------------------------------------------
+  # 3.2 Lint TOML (taplo-lint)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: taplo-lint
+        name: 'Lint TOML (taplo-lint)'
+        language: system
+        entry: taplo lint --no-schema
+        types: [toml]
+
+  # ----------------------------------------------------------------------------
+  # 3.3 Lint Makefile (checkmake)
+  # ----------------------------------------------------------------------------
+
+  - repo: https://github.com/checkmake/checkmake
+    rev: '0.2.2'
+    hooks:
+      - id: checkmake
+        name: 'Lint Makefile (checkmake)'
+        args: ['--config', 'configs/checkmake.ini']
+
+  - repo: local
+    hooks:
+      - id: check-makefile
+        name: 'Lint Makefile .PHONY consistency'
+        description: Ensure all Makefile targets are listed in .PHONY and sorted alphabetically
+        entry: scripts/pre_commit/check_makefile.py
+        language: system
+        files: ^(GNUmakefile|[Mm]akefile)$
+        pass_filenames: false
+
+  # ----------------------------------------------------------------------------
+  # 3.4 Lint Markdown (PyMarkdown)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pymarkdown
+        name: 'Lint Markdown (PyMarkdown)'
+        language: system
+        entry: pymarkdown --disable-rules MD013,MD024 scan
+        files: \.(md)$
+        exclude: ^\.codegenius/learnings\.md$
+
+  # ----------------------------------------------------------------------------
+  # 3.5 Lint Shell Script (bashate)
+  # ----------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: bashate
+        name: 'Lint Shell Script (bashate)'
+        language: system
+        entry: bashate --max-line-length 100
+        types: [shell]
+
+  # (Future: add mypy, flake8, or other static analysis tools here)
+
+  # =============================================================================
+  # 4. Link / Reference Checks
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-links
+        name: '━━━━━━━━━━━━ 4. Link / Reference Checks ━━━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  # =============================================================================
+  # 5. Project-specific / Build / Generated Code Checks
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-project-specific
+        name: '━━━━━━━━━━━━ 5. Project-specific Checks ━━━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  - repo: local
+    hooks:
+      - id: check-all-declarations
+        name: Check __all__ declarations
+        description: Ensure all Python modules have __all__ declarations
+        entry: env USE_LOCAL_COREAI=1 python scripts/pre_commit/check_all_declarations.py src/coreai_opt
+        language: system
+        types: [python]
+        exclude: ^tests/
+
+  - repo: local
+    hooks:
+      - id: towncrier-check
+        name: Check changelog fragments (towncrier)
+        entry: scripts/pre_commit/towncrier_check.sh
+        language: system
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: validate-changelog
+        name: Validate CHANGELOG.md (Keep a Changelog format)
+        description: Ensure CHANGELOG.md follows Keep a Changelog standards
+        entry: kacl-cli verify
+        language: system
+        files: ^CHANGELOG\.md$
+        pass_filenames: false
+
+  # =============================================================================
+  # 6. Policy / Commit Metadata / Security Checks
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-policy
+        name: '━━━━━━━━━━━━ 6. Policy / Security Checks ━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true
+
+  # (Future: add commit message linting, secret scanning, branch checks, etc.)
+  # Examples:
+  # - commitizen for commit message linting
+  # - detect-secrets or gitleaks for secret scanning
+  # - check-commit for branch name validation
+
+  # =============================================================================
+  # 7. Summary
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: section-summary
+        name: '━━━━━━━━━━━━━━━━━━━━━ Done ━━━━━━━━━━━━━━━━━━━━━━━'
+        language: system
+        entry: 'true'
+        pass_filenames: false
+        always_run: true

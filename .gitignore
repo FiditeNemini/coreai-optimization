@@ -1,0 +1,57 @@
+# macOS
+*.DS_Store
+
+# Python bytecode and caches
+*.pyc
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / IDE
+.*.sw[pon]
+*~
+.idea
+.vscode
+.pycharmrc
+.ipynb_checkpoints
+
+# Build artifacts
+*.egg-info
+/build
+/dist
+/*whl
+docs/build/
+docs/src/api/generated/
+
+# Coverage / test results
+.coverage*
+.cache/
+coverage.xml
+test-results/
+logs/
+pytest-results.xml
+.lycheecache
+data/
+tests/_test_data/
+
+# Virtual environments / dependency lock
+.coreai-opt-venv
+.envrc
+.venv*
+uv.lock
+
+# Misc
+*.npy
+*.o
+*.so
+*.nc
+.python-version
+/.tox
+deps/
+scratch/
+/local_stash
+/model_weights
+mypy.ini
+
+# Local-only working directory
+.local/
