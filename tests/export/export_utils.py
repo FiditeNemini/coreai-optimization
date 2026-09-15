@@ -647,6 +647,7 @@ def run_quantization_export_test(
     externalized_model: torch.nn.Module | None = None,
     snr_thresh: float = 20.0,
     psnr_thresh: float = 22.0,
+    mmap_dir: str | None = None,
 ) -> None:
     """Quantize, finalize, export and verify a model against its prepared forward.
 
@@ -669,6 +670,8 @@ def run_quantization_export_test(
             CoreAI backend.
         snr_thresh: Minimum acceptable SNR value
         psnr_thresh: Minimum acceptable PSNR value
+        mmap_dir: If provided, finalize uses the memory efficient mmap for the quantized
+        weights.
 
     """
     if model_dtype is not None:
@@ -686,7 +689,7 @@ def run_quantization_export_test(
     with torch.no_grad():
         prepared_model_output = prepared_model(input_data)
 
-    finalized_model = quantizer.finalize(backend=export_backend)
+    finalized_model = quantizer.finalize(backend=export_backend, mmap_dir=mmap_dir)
 
     convert_and_verify(
         finalized_model=finalized_model,
