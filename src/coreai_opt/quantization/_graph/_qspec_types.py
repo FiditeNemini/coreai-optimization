@@ -11,7 +11,9 @@ Data and enums only, so no phase has to import another just to name a type.
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 import torch.fx as fx
@@ -67,6 +69,9 @@ class FieldName(enum.Enum):
     QUANTIZATION_TARGET = enum.auto()
 
 
+_ALL_FIELDS: frozenset[FieldName] = frozenset(FieldName)
+
+
 @dataclass(frozen=True)
 class FieldValue:
     """A value proposed for one field, plus the priority it came from.
@@ -90,21 +95,52 @@ a per-field exception.
 """
 
 
-@dataclass
 class ProvisionalQSpec:
     """Mutable per-observer state.
 
     Several slots may reference one instance; that object identity is how
     ``ShareObserverInstance`` expresses sharing.
 
+    The field map is either empty, meaning nothing has spoken for the slot, or
+    whole, carrying every :class:`FieldName`. :meth:`merge_fields` refuses a
+    write that would leave it partial; the constructor takes the map as given.
+
     Attributes:
-        fields (dict[FieldName, FieldValue]): Reconciled per-field state.
         declined_by (int | None): Priority of the config that declined this
             slot, or ``None``. See :attr:`declined`.
     """
 
-    fields: dict[FieldName, FieldValue] = field(default_factory=dict)
-    declined_by: int | None = None
+    def __init__(
+        self,
+        fields: Mapping[FieldName, FieldValue] | None = None,
+        declined_by: int | None = None,
+    ) -> None:
+        self._fields: dict[FieldName, FieldValue] = dict(fields or {})
+        self.declined_by = declined_by
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(fields={self._fields!r}, declined_by={self.declined_by!r})"
+
+    @property
+    def fields(self) -> Mapping[FieldName, FieldValue]:
+        """Reconciled per-field state. Write through :meth:`merge_fields`."""
+        return MappingProxyType(self._fields)
+
+    def merge_fields(self, updates: Mapping[FieldName, FieldValue]) -> None:
+        """Merge ``updates`` into the field map.
+
+        Raises if the result would hold some fields but not all, unless it was
+        already partial before the write: reconciliation overwrites values
+        constantly, and only adding a key can break the invariant.
+        """
+        merged = {**self._fields, **updates}
+        if merged.keys() and merged.keys() != _ALL_FIELDS:
+            raise ReconciliationError(
+                f"Writing {sorted(f.name for f in updates)} would leave a partial "
+                f"qspec holding {sorted(f.name for f in merged)}. A qspec is either "
+                f"empty or whole."
+            )
+        self._fields = merged
 
     @property
     def declined(self) -> bool:

@@ -63,14 +63,48 @@ def _slot(name: str = "s", kind: SlotKind = SlotKind.OUTPUT, arg_index: int = 0)
     return NodeSlot(node=Mock(name=name), kind=kind, arg_index=arg_index)
 
 
-def _pspec(**fields: FieldValue) -> ProvisionalQSpec:
-    """Build a ProvisionalQSpec by keyword: DTYPE=FieldValue(int8, 0), ..."""
-    field_map = {FieldName[key]: value for key, value in fields.items()}
-    return ProvisionalQSpec(fields=field_map)
-
-
 def _fv(value, priority: int = 0) -> FieldValue:
     return FieldValue(value=value, priority=priority)
+
+
+def _build_whole_field_map(**overrides: FieldValue) -> dict[FieldName, FieldValue]:
+    base = {field_name: _fv(None) for field_name in FieldName}
+    base.update({FieldName[key]: value for key, value in overrides.items()})
+    return base
+
+
+def _pspec(**fields: FieldValue) -> ProvisionalQSpec:
+    if not fields:
+        return ProvisionalQSpec()
+    return ProvisionalQSpec(fields=_build_whole_field_map(**fields))
+
+
+# ---------------------------------------------------------------------------
+# ProvisionalQSpec field writes.
+# ---------------------------------------------------------------------------
+
+
+class TestProvisionalQSpecFieldWrites:
+    """Writes reach the field map only through ``merge_fields``, which keeps the
+    map empty or whole.
+    """
+
+    def test_direct_write_to_fields_raises(self) -> None:
+        with pytest.raises(TypeError):
+            ProvisionalQSpec().fields[FieldName.DTYPE] = _fv(torch.int8)
+
+    def test_seeding_a_whole_field_map_is_allowed(self) -> None:
+        """Empty to whole is the one write that introduces fields legitimately."""
+        qspec = ProvisionalQSpec()
+        qspec.merge_fields(_build_whole_field_map())
+        assert set(qspec.fields) == set(FieldName)
+
+    def test_introducing_a_field_short_of_whole_raises(self) -> None:
+        """A constraint writing its own subset into a slot no config seeded."""
+        qspec = ProvisionalQSpec()
+        with pytest.raises(ReconciliationError, match="would leave a partial"):
+            qspec.merge_fields({FieldName.DTYPE: _fv(torch.int8)})
+        assert qspec.fields == {}
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +299,7 @@ class TestShareFields:
         state: ProvisionalQSpecMap = {
             a: _pspec(DTYPE=_fv(torch.int4, priority=0)),
             b: _pspec(DTYPE=_fv(torch.int8, priority=5)),
-            c: _pspec(),  # no proposal
+            c: _pspec(DTYPE=_fv(torch.int8, priority=9)),  # weakest proposal
         }
         con = ShareFields(_slots=frozenset({a, b, c}), fields=frozenset({FieldName.DTYPE}))
         changed = con.apply(state)
@@ -331,7 +365,7 @@ class TestShareObserverInstance:
         a, b = _slot("a"), _slot("b")
         state: ProvisionalQSpecMap = {a: _pspec(), b: _pspec()}
         ShareObserverInstance(_slots=frozenset({a, b})).apply(state)
-        state[a].fields[FieldName.DTYPE] = _fv(torch.int8, 0)
+        state[a].merge_fields(_build_whole_field_map(DTYPE=_fv(torch.int8, 0)))
         # b's ProvisionalQSpec is the same object → sees the new field.
         assert state[b].fields[FieldName.DTYPE].value == torch.int8
 
@@ -782,12 +816,12 @@ class TestInheritFields:
     @staticmethod
     def _with(**overrides) -> ProvisionalQSpec:
         base = {
-            FieldName.DTYPE: _fv(torch.int8),
-            FieldName.QSCHEME: _fv(QuantizationScheme.SYMMETRIC),
-            FieldName.FLOAT_RANGE: _fv([None, None]),
+            "DTYPE": _fv(torch.int8),
+            "QSCHEME": _fv(QuantizationScheme.SYMMETRIC),
+            "FLOAT_RANGE": _fv([None, None]),
         }
-        base.update({FieldName[key]: value for key, value in overrides.items()})
-        return ProvisionalQSpec(fields=base)
+        base.update(overrides)
+        return ProvisionalQSpec(fields=_build_whole_field_map(**base))
 
     _FACTS = frozenset({FieldName.QSCHEME, FieldName.FLOAT_RANGE})
 
@@ -850,6 +884,21 @@ class TestInheritFields:
         con = InheritFields(source=src, targets=frozenset({dst}), fields=self._FACTS)
         assert con.apply(state)
         assert con.apply(state) == set()
+
+    def test_skips_target_whose_spec_is_empty(self) -> None:
+        """An empty field map means nothing has spoken for the slot, so there is
+        no observer to inherit into."""
+        src, dst = _slot("a"), _slot("b")
+        empty = ProvisionalQSpec()
+        state: ProvisionalQSpecMap = {
+            src: self._with(FLOAT_RANGE=_fv([0.0, None])),
+            dst: empty,
+        }
+        changed = InheritFields(source=src, targets=frozenset({dst}), fields=self._FACTS).apply(
+            state
+        )
+        assert changed == set()
+        assert empty.fields == {}
 
     def test_skips_declined_target(self) -> None:
         """A decline is an explicit opt-out and outranks a propagated fact."""

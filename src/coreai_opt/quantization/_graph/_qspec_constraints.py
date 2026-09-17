@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ._qspec_types import (
+    _ALL_FIELDS,
     FieldName,
     FieldValue,
     NodeSlot,
@@ -23,9 +24,6 @@ from ._qspec_types import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-_ALL_FIELDS: frozenset[FieldName] = frozenset(FieldName)
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +73,7 @@ class ShareFields(Constraint):
                 qspec = _get_or_create(qspecs, slot)
                 current = qspec.fields.get(field_name)
                 if _field_value_stronger(reconciled, current):
-                    qspec.fields[field_name] = reconciled
+                    qspec.merge_fields({field_name: reconciled})
                     changed.add(slot)
         return changed
 
@@ -114,13 +112,13 @@ class InheritFields(Constraint):
                 continue
             for target in self.targets:
                 target_qspec = qspecs.get(target)
-                if target_qspec is None or target_qspec.declined:
+                if target_qspec is None or not target_qspec.fields or target_qspec.declined:
                     # Only slots that already hold fields, and are not opted
                     # out, can inherit.
                     continue
                 if target_qspec.fields.get(field_name) == source_value:
                     continue
-                target_qspec.fields[field_name] = source_value
+                target_qspec.merge_fields({field_name: source_value})
                 changed.add(target)
         return changed
 
