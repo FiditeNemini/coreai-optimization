@@ -165,6 +165,17 @@ def simple_linear_model_input():
     return torch.randn(4, 64)
 
 
+class WeightReadOutsideOp(nn.Module):
+    """An nn.Linear whose weight is also accessed directly
+    in forward()."""
+
+    def __init__(self, dim: int = 64) -> None:
+        super().__init__()
+        self.fc = nn.Linear(dim, dim, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc(x) + self.fc.weight.sum()
+
 class LinearBatchNormModel(torch.nn.Module):
     """Linear model with a BatchNorm between its two layers.
 
