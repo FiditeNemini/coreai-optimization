@@ -311,6 +311,7 @@ no_implicit_optional = true
 testpaths = [ "tests" ]
 norecursedirs = [ ".oss-export" ]
 markers = [
+    "cuda: marks tests that require an NVIDIA GPU",
     # `seed` is registered by tests/config/plugin.py, alongside the fixture that reads it.
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
