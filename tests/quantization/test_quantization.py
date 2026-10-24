@@ -492,14 +492,15 @@ class TestDynamicActivationQuantization:
         [
             (ExportBackend.CoreAI, False),
             (ExportBackend.CoreML, False),
-            (ExportBackend._TORCH, True),
+            (ExportBackend.Torch, True),
         ],
     )
     def test_finalize_rejects_dynamic_for_non_torch_backends(
         self, execution_mode, backend, is_supported
     ):
         """``finalize`` must reject CoreAI/CoreML for dynamic FakeQuantize
-        modules. ``_TORCH`` is allowed since it returns the prepared model as-is."""
+        modules. ``Torch`` is allowed since it keeps activation fake quantization,
+        so dynamic qparams are still recomputed every forward."""
         config = self._make_mixed_dynamic_static_config(execution_mode)
         quantizer = Quantizer(SimpleLinearModel(), config)
         prepared_model = quantizer.prepare((torch.randn(4, 64),))
