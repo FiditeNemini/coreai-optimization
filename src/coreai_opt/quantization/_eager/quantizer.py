@@ -6,7 +6,7 @@
 import itertools
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from os import PathLike
 from typing import Any
@@ -176,24 +176,33 @@ class EagerQuantizer(_BaseQuantizer, EagerCompressionComponentBuilderMixin):
                 stacklevel=2,
             )
 
-    def prepare(self, example_inputs: tuple[Any, ...]) -> nn.Module:
+    def prepare(
+        self,
+        example_inputs: tuple[Any, ...],
+        *,
+        state_dict: Mapping[str, torch.Tensor] | None = None,
+    ) -> nn.Module:
         """Prepare model for quantization by inserting fake quantizers.
 
         Args:
             example_inputs: Sample inputs used to trace the model and configure
                 quantizers. When activation quantization is in use, these should
                 be representative of the data the model would typically see.
+            state_dict: Optional state dict of a model previously prepared with the
+                same config. When provided, its quantization state (e.g. calibrated
+                qparams) is loaded after preparing.
 
         Returns:
             Model with fake quantizers inserted
+
+        Raises:
+            RuntimeError: If the model has already been prepared.
+            RuntimeError: If ``state_dict`` does not match the prepared model.
         """
         if self._is_model_prepared(self._model):
-            warnings.warn(
-                "Model has already been prepared for quantization. "
-                "This call to prepare will be a no-op",
-                stacklevel=2,
+            raise RuntimeError(
+                "Model has already been prepared. Cannot re-prepare a prepared model."
             )
-            return self._model
 
         # Move model to eval mode and disable gradients during the initial forward pass to insert
         # quantization layers. The model will be put back into its original mode when exiting
@@ -215,6 +224,8 @@ class EagerQuantizer(_BaseQuantizer, EagerCompressionComponentBuilderMixin):
             # pass due to incompatible tensor shapes (e.g., non-divisible block sizes).
             self._remove_disabled_fake_quant_modules()
 
+        if state_dict is not None:
+            self._load_prepared_state_dict(self._model, state_dict)
         self._model.apply(enable_fake_quant)
         self._model.apply(disable_observer)
 

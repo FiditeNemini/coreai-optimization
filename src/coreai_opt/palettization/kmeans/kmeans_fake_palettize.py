@@ -266,8 +266,9 @@ class _KMeansFakePalettize(_FakePalettizeImplBase):
         self, state_dict, prefix, local_metadata, strict, missing_keys, *args, **kwargs
     ):
         """Load centroids from a checkpoint, reconstructing them from a legacy
-        ``lut`` buffer when present. Absent ``indices`` are not reported as missing;
-        they are recomputed from centroids on next use.
+        ``lut`` buffer when present, and initialize an uninitialized LUT quantizer from them.
+        Absent ``indices`` are not reported as missing; they are recomputed from centroids
+        on next use.
         """
         lut_key, centroids_key, index_key = prefix + "lut", prefix + "centroids", prefix + "indices"
         if centroids_key not in state_dict and lut_key in state_dict:
@@ -282,6 +283,15 @@ class _KMeansFakePalettize(_FakePalettizeImplBase):
             self._centroids_initialized = True
             scale_ok = not self.enable_per_channel_scale or self.per_channel_scale is not None
             self._indices_stale = not (had_indices and scale_ok)
+
+            lut_scale = None
+            if self._lut_fake_quantizer is not None:
+                lut_scale = getattr(self._lut_fake_quantizer.qparams_calculator, "scale", None)
+            if lut_scale is not None and lut_scale.numel() == 0:
+                # Initialize the LUT quantizer as k-means would, so its qparams buffers take their
+                # shapes before its own saved qparams load: load_state_dict loads child
+                # modules after this hook.
+                self.quantize_lut(self._raw_lut(self.centroids))
 
     def _centroids_from_lut(self, lut: torch.Tensor) -> torch.Tensor:
         """Invert ``_reshape_lut_tensor`` to recover ``(num_blocks, num_clusters,

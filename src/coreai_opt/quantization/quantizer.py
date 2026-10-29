@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import warnings
+from collections.abc import Mapping
 from contextlib import contextmanager
 from os import PathLike
 from typing import Any
@@ -324,6 +325,8 @@ class Quantizer(_BaseQuantizer):
         example_inputs: tuple[Any, ...],
         dynamic_shapes: dict[str, Any] | tuple[Any] | list[Any] | None = None,
         export_with_no_grad: bool = True,
+        *,
+        state_dict: Mapping[str, torch.Tensor] | None = None,
     ) -> nn.Module | fx.GraphModule:
         """
         Prepare the model for quantization by inserting fake quantization modules.
@@ -352,10 +355,19 @@ class Quantizer(_BaseQuantizer):
                 Ignored in EAGER mode.
             export_with_no_grad: Whether to export with no_grad (graph mode
                 only). Ignored in EAGER mode.
+            state_dict: Optional state dict of a model previously prepared with the
+                same config (and, in graph mode, the same example inputs, dynamic
+                shapes and torch version), e.g. after calibration or QAT. When
+                provided, its quantization state is loaded after preparing, and fake
+                quantization and observers are left as a regular ``prepare`` leaves them.
 
         Returns:
             The prepared model with fake quantization modules inserted, ready for
             calibration or training. This is a data-free PTQ compressed model.
+
+        Raises:
+            RuntimeError: If the model has already been prepared.
+            RuntimeError: If ``state_dict`` does not match the prepared model.
 
         Note:
             In graph mode, the returned ``fx.GraphModule`` supports calling
@@ -382,12 +394,13 @@ class Quantizer(_BaseQuantizer):
                     UserWarning,
                     stacklevel=2,
                 )
-            prepared_model = self._quantizer.prepare(example_inputs)
+            prepared_model = self._quantizer.prepare(example_inputs, state_dict=state_dict)
         else:
             prepared_model = self._quantizer.prepare(
                 example_inputs,
                 dynamic_shapes=dynamic_shapes,
                 export_with_no_grad=export_with_no_grad,
+                state_dict=state_dict,
             )
 
         self._module_to_fqs = self._get_fake_quantize_modules()

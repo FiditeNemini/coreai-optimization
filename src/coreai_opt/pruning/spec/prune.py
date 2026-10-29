@@ -37,6 +37,7 @@ class PruneImplBase(CompressionSimulatorBase):
     """
 
     schedule: SparsityScheduleBase | None = None
+    step_count: torch.Tensor
     _sparsity: float
     _target_sparsity: float
     _pruning_scheme: PruningScheme
@@ -55,6 +56,35 @@ class PruneImplBase(CompressionSimulatorBase):
         self.schedule = None
         self._dirty = True
         self.register_buffer("mask", torch.empty(0))
+        # Persisted so a reloaded model resumes mid-schedule; the sparsity is derived from it.
+        self.register_buffer("step_count", torch.tensor(0, dtype=torch.int64))
+
+    def _load_from_state_dict(
+        self,
+        state_dict: dict[str, Any],
+        prefix: str,
+        local_metadata: dict[str, Any],
+        strict: bool,
+        missing_keys: list[str],
+        unexpected_keys: list[str],
+        error_msgs: list[str],
+    ) -> None:
+        """Load a saved mask and step count, and derive the scheduled sparsity from the step.
+
+        A mask that has not been computed yet takes the saved shape.
+        """
+        mask_key = prefix + "mask"
+        # The mask is empty until first computed; take the saved shape so it loads correctly
+        if mask_key in state_dict and self.mask.numel() == 0:
+            self.mask = torch.empty_like(state_dict[mask_key], device=self.mask.device)
+        super()._load_from_state_dict(
+            state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
+        )
+        if self.schedule is not None:
+            self.update_sparsity(int(self.step_count))
+        if mask_key in state_dict and self.mask.numel() > 0:
+            # A loaded mask is current, this prevents it from being recomputed during forward pass
+            self._dirty = False
 
     @property
     def sparsity(self) -> float:
@@ -92,17 +122,19 @@ class PruneImplBase(CompressionSimulatorBase):
             raise RuntimeError(
                 "update_sparsity called on a PruneImplBase with no schedule attached."
             )
-        new = self.schedule.compute_sparsity(step_count, self._target_sparsity, self._sparsity)
+        new = self.schedule.compute_sparsity(step_count, self._target_sparsity)
         if new != self._sparsity:
             self._sparsity = new
             self._dirty = True
 
     def forward(self, weight: torch.Tensor) -> torch.Tensor:
         """Compute / re-compute the mask if stale, and then apply it to the weight."""
+        # Checked on every call: a mask loaded from a state dict is not dirty, but may be on
+        # another device or dtype than the weight.
+        if self.mask.device != weight.device or self.mask.dtype != weight.dtype:
+            self.mask = self.mask.to(device=weight.device, dtype=weight.dtype)
         if self._dirty:
             new_mask = self.compute_mask(weight, self._sparsity, self._pruning_scheme)
-            if self.mask.device != weight.device or self.mask.dtype != weight.dtype:
-                self.mask = self.mask.to(device=weight.device, dtype=weight.dtype)
             if self.mask.shape != new_mask.shape:
                 self.mask.resize_(new_mask.shape)
             self.mask.copy_(new_mask)
